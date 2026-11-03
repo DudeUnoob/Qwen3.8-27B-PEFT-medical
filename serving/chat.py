@@ -1,4 +1,4 @@
-"""Stream a chat from the deployed medical adapter without extra dependencies."""
+"""Stream a chat from the deployed medical adapter."""
 
 import argparse
 import json
@@ -7,14 +7,13 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from serving.config import load_credentials
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def respond(messages, model):
-    credentials = dict(
-        line.split("=", 1) for line in (ROOT / ".env").read_text().splitlines()
-        if line and not line.startswith("#")
-    )
+    credentials = load_credentials(ROOT)
     payload = {
         "model": model,
         "messages": messages,
@@ -37,6 +36,7 @@ def respond(messages, model):
     first_token = None
     content = []
     usage = None
+    completed = False
     with urlopen(request, timeout=1500) as response:
         for raw in response:
             line = raw.decode().strip()
@@ -44,6 +44,7 @@ def respond(messages, model):
                 continue
             data = line[6:]
             if data == "[DONE]":
+                completed = True
                 break
             chunk = json.loads(data)
             if "error" in chunk:
@@ -56,6 +57,8 @@ def respond(messages, model):
                         first_token = time.monotonic() - started
                     print(token, end="", flush=True)
                     content.append(token)
+    if not completed:
+        raise RuntimeError("Stream ended before completion; the partial response was not saved")
     elapsed = time.monotonic() - started
     stats = [f"total {elapsed:.2f}s"]
     if first_token is not None:

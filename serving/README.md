@@ -11,6 +11,10 @@ From the project directory:
 Type a prompt to see the response stream into the terminal. `/reset` clears
 conversation history and `/quit` exits. The client reads `.env` automatically.
 Cold starts can take several minutes; timing includes that wait.
+Both clients use python-dotenv, so quoted values, comments, whitespace, and
+`export` declarations are parsed consistently with Modal's dotenv loader.
+If a stream ends before `[DONE]`, the terminal client reports a failure and
+does not add the partial turn to conversation history.
 
 For one prompt, or a comparison with the unadapted base:
 

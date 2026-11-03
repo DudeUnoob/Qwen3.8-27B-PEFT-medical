@@ -8,14 +8,13 @@ from urllib.request import Request, urlopen
 
 import modal
 
+from serving.config import load_credentials
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
-    credentials = dict(
-        line.split("=", 1) for line in (ROOT / ".env").read_text().splitlines()
-        if line and not line.startswith("#")
-    )
+    credentials = load_credentials(ROOT)
     endpoint = modal.Function.from_name(
         "qwen-peft-medical-vllm", "serve", environment_name="main"
     ).get_web_url().rstrip("/")

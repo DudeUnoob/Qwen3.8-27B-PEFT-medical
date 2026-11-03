@@ -3,10 +3,10 @@ name = "qwen-peft-medical"
 version = "0.1.0"
 description = "Single-GPU vLLM serving for the Qwen3-8B medical LoRA adapter"
 requires-python = ">=3.12"
-dependencies = ["modal==1.6.3"]
+dependencies = ["modal==1.6.3", "python-dotenv==1.2.1"]
 
 [project.optional-dependencies]
-web = ["fastapi==0.119.1", "authlib==1.6.5", "httpx==0.28.1", "itsdangerous==2.2.0", "uvicorn==0.38.0", "python-dotenv==1.2.1"]
+web = ["fastapi==0.119.1", "pydantic>=2,<3", "authlib==1.6.5", "httpx==0.28.1", "itsdangerous==2.2.0", "uvicorn==0.38.0"]
 test = ["pytest>=8,<10"]
 
 [build-system]

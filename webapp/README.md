@@ -79,6 +79,8 @@ Tests cover signed-out and unconfigured access, OAuth state mismatch,
 non-owner identities, username changes, forged and expired sessions, CSRF,
 cross-origin requests, logout, request size, and the streaming proxy with a
 mock inference server. There is no production test-login route or bypass.
+The local web extra and Modal image both explicitly require Pydantic v2,
+matching the request validation APIs used by the application.
 
 The website uses no GPU. The separate inference app retains its limit of
 one GPU and scales to zero after idle time. To stop only the website:

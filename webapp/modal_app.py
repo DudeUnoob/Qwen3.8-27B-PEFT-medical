@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 secret = modal.Secret.from_name("qwen-medical-web-config")
 app = modal.App("qwen-peft-medical-web")
 image = (modal.Image.debian_slim(python_version="3.12")
-         .pip_install("fastapi==0.119.1", "authlib==1.6.5", "httpx==0.28.1", "itsdangerous==2.2.0")
+         .pip_install("fastapi==0.119.1", "pydantic>=2,<3", "authlib==1.6.5", "httpx==0.28.1", "itsdangerous==2.2.0")
          .add_local_dir(ROOT / "webapp", "/root/webapp", ignore=["__pycache__/"]))
 
 

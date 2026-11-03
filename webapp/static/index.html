@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Qwen Medical · Private</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<body>
+<aside class="sidebar">
+  <div class="brand"><span class="brand-mark">Q</span><div>Qwen<span class="subbrand">MEDICAL</span></div></div>
+  <button id="new-chat" class="new-chat" hidden><span>＋</span> New conversation</button>
+  <div class="sidebar-bottom"><span class="privacy-dot"></span> Personal workspace<br><small>Owner access only</small></div>
+</aside>
+<main>
+  <header><div><span class="model-name">Qwen Medical</span><span class="tag">Fine-tuned</span></div><div id="account" hidden><span id="username"></span><button id="logout" class="text-button">Sign out</button></div></header>
+  <section id="login-view" class="login-view" hidden>
+    <div class="lock-mark" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg></div>
+    <div class="eyebrow">YOUR PRIVATE WORKSPACE</div>
+    <h1>A quiet place<br>to ask questions.</h1>
+    <p>Chat with your fine-tuned Qwen model.<br>Sign in to your personal workspace to begin.</p>
+    <a class="primary login-button" href="/login">Sign in with GitHub <span aria-hidden="true">↗</span></a>
+    <small>Access is limited to your GitHub account.</small>
+  </section>
+  <section id="chat-view" class="chat-view" hidden>
+    <div id="messages" class="messages" role="log" aria-label="Conversation" aria-live="polite"></div>
+    <section id="welcome" class="welcome"><span class="welcome-mark">Q</span><div class="eyebrow">QWEN MEDICAL · YOUR ADAPTER</div><h1>What’s on your mind?</h1><p>Start a conversation with your model.</p><div class="suggestions"><button data-prompt="Explain what an antibody is in two sentences.">Explain a concept <span>↗</span></button><button data-prompt="What is the difference between a virus and a bacterium?">Compare two ideas <span>↗</span></button></div></section>
+    <div class="composer-wrap"><div id="status" class="status" role="status">Ready when you are</div><form id="composer"><label class="sr-only" for="prompt">Your message</label><textarea id="prompt" rows="1" maxlength="6000" placeholder="Ask your model a question…" required></textarea><button id="send" class="send" type="submit" aria-label="Send message">↑</button><button id="stop" class="send" type="button" hidden aria-label="Stop generation">■</button></form><div class="composer-note"><span>Chat history stays in this tab</span><span>Enter to send · Shift + Enter for a new line</span></div></div>
+  </section>
+  <div id="page-error" class="page-error" role="alert" hidden></div>
+</main>
+</body></html>

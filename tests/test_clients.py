@@ -33,6 +33,20 @@ def test_chat_parses_shared_dotenv_syntax(tmp_path, monkeypatch, capsys):
     assert "total" in capsys.readouterr().out
 
 
+def test_chat_routes_api_v2_to_its_own_endpoint(tmp_path, monkeypatch, capsys):
+    write_env(tmp_path)
+    monkeypatch.setattr(chat, "ROOT", tmp_path)
+    with pytest.raises(RuntimeError, match="MODEL_ENDPOINT_V2"):
+        chat.respond([{"role": "user", "content": "Hi"}], "qwen-medical", "v2")
+    with (tmp_path / ".env").open("a") as env:
+        env.write("MODEL_ENDPOINT_V2=https://model-v2.example/\n")
+    requests = []
+    monkeypatch.setattr(chat, "urlopen", lambda request, **kw: requests.append(request) or BytesIO(
+        b'data: {"choices":[{"delta":{"content":"Hi"}}]}\n\ndata: [DONE]\n\n'))
+    assert chat.respond([{"role": "user", "content": "Hi"}], "qwen-medical", "v2") == "Hi"
+    assert requests[0].full_url == "https://model-v2.example/v1/chat/completions"
+
+
 @pytest.mark.parametrize("payload", [b'', b'data: {"choices":[{"delta":{"content":"partial"}}]}\n'])
 def test_chat_rejects_stream_without_completion_marker(tmp_path, monkeypatch, capsys, payload):
     write_env(tmp_path)

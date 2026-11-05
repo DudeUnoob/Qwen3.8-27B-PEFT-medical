@@ -8,7 +8,8 @@ name contains an older model label; the notebook and exported adapter both
 identify `Qwen/Qwen3-8B` as the actual base model.
 
 See [serving instructions](serving/README.md) for deployment, authentication,
-and API examples. Use the project's isolated environment:
+and API examples. The two-GPU v2 stack, RAD scheduler, and load test are
+documented in [docs/serving-v2-architecture.md](docs/serving-v2-architecture.md). Use the project's isolated environment:
 
 ```sh
 source .venv/bin/activate

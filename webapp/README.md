@@ -61,6 +61,9 @@ then stopped; deploy them again to resume service.
   during callback and discarded, not placed in the session cookie.
 - Modal credentials are attached only by the backend. The original GPU API
   remains protected by Modal proxy authentication.
+- The header selector picks serving API v1 (`MODEL_ENDPOINT`) or v2
+  (`MODEL_ENDPOINT_V2`); a version without a configured endpoint is disabled.
+  Both stream tokens to the page as they are generated.
 - The webpage streams responses from `qwen-medical`. Conversation history is
   kept in browser memory and is cleared by refresh, new chat, or sign out.
   Requests necessarily reach the inference service; infrastructure logging

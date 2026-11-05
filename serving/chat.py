@@ -10,9 +10,18 @@ from urllib.request import Request, urlopen
 from serving.config import load_credentials
 
 ROOT = Path(__file__).resolve().parents[1]
+ENDPOINT_KEYS = {"v1": "MODEL_ENDPOINT", "v2": "MODEL_ENDPOINT_V2"}
 
 
-def respond(messages, model):
+def resolve_endpoint(credentials, api_version):
+    key = ENDPOINT_KEYS[api_version]
+    endpoint = credentials.get(key, "").rstrip("/")
+    if not endpoint.startswith("https://"):
+        raise RuntimeError(f"Set {key} in the local .env file to the deployed {api_version} HTTPS URL")
+    return endpoint
+
+
+def respond(messages, model, api_version="v1"):
     credentials = load_credentials(ROOT)
     payload = {
         "model": model,
@@ -23,9 +32,7 @@ def respond(messages, model):
         "stream_options": {"include_usage": True},
         "chat_template_kwargs": {"enable_thinking": False},
     }
-    endpoint = credentials.get("MODEL_ENDPOINT", "").rstrip("/")
-    if not endpoint.startswith("https://"):
-        raise RuntimeError("Set MODEL_ENDPOINT in the local .env file to the deployed HTTPS URL")
+    endpoint = resolve_endpoint(credentials, api_version)
     request = Request(endpoint + "/v1/chat/completions",
                       data=json.dumps(payload).encode(), headers={
                           "Content-Type": "application/json",
@@ -74,8 +81,10 @@ def main():
     parser.add_argument("prompt", nargs="?", help="One prompt; omit for interactive chat")
     parser.add_argument("--model", default="qwen-medical",
                         choices=["qwen-medical", "Qwen/Qwen3-8B"])
+    parser.add_argument("--api-version", default="v1", choices=sorted(ENDPOINT_KEYS),
+                        help="v1: one GPU, stock vLLM scheduler; v2: two tensor-parallel GPUs with RAD")
     args = parser.parse_args()
-    print(f"Model: {args.model}", flush=True)
+    print(f"Model: {args.model} | API {args.api_version}", flush=True)
     print("A cold start can take several minutes. /reset clears history; /quit exits.", flush=True)
     messages = []
     while True:
@@ -94,7 +103,7 @@ def main():
             messages.append({"role": "user", "content": prompt})
             print("\nAssistant: ", end="", flush=True)
             try:
-                answer = respond(messages, args.model)
+                answer = respond(messages, args.model, args.api_version)
             except (HTTPError, URLError, TimeoutError, RuntimeError) as error:
                 messages.pop()
                 if isinstance(error, HTTPError):

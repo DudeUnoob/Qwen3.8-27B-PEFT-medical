@@ -119,6 +119,31 @@ def test_authenticated_stream_only_targets_medical_adapter():
     assert SETTINGS["MODAL_SECRET"] not in response.text
 
 
+def test_api_v2_streams_from_its_own_endpoint_only_when_configured():
+    hosts = []
+
+    def upstream(request):
+        hosts.append(request.url.host)
+        return httpx.Response(200, text='data: {"choices":[{"delta":{"content":"Hi"}}]}\n\ndata: [DONE]\n\n')
+
+    browser = client(FakeGitHub(), httpx.MockTransport(upstream))
+    csrf = owner(browser)
+    assert browser.get("/api/me").json()["api_versions"] == ["v1"]
+    body = {"messages": [{"role": "user", "content": "Hi"}], "api_version": "v2"}
+    headers = {"Origin": ORIGIN, "X-CSRF-Token": csrf}
+    assert browser.post("/api/chat", headers=headers, json=body).status_code == 503
+    assert browser.post("/api/chat", headers=headers,
+                        json={**body, "api_version": "v3"}).status_code == 422
+
+    browser = client(FakeGitHub(), httpx.MockTransport(upstream),
+                     settings={**SETTINGS, "MODEL_ENDPOINT_V2": "https://model-v2.example"})
+    csrf = owner(browser)
+    assert browser.get("/api/me").json()["api_versions"] == ["v1", "v2"]
+    response = browser.post("/api/chat", headers={**headers, "X-CSRF-Token": csrf}, json=body)
+    assert [json.loads(line)["type"] for line in response.text.splitlines()] == ["token", "done"]
+    assert hosts == ["model-v2.example"]
+
+
 def test_oversize_payload_rejected_before_inference():
     browser = client(FakeGitHub())
     csrf = owner(browser)

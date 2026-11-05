@@ -110,3 +110,74 @@ downloads base weights; subsequent cold starts can use the persistent cache.
 
 To stop serving, run `modal app stop qwen-peft-medical-vllm --env main`.
 The adapter and cache volumes persist independently of the app.
+
+## API v2: two GPUs with the RAD scheduler
+
+Diagrams and the decision log are in
+[docs/serving-v2-architecture.md](../docs/serving-v2-architecture.md).
+
+| | v1 (`modal_app.py`) | v2 (`modal_app_v2.py`) |
+| --- | --- | --- |
+| GPUs | 1× L4 (A10G fallback) | 2× L4, tensor parallel |
+| Scheduler | stock vLLM | RAD ([arXiv:2508.01002](https://arxiv.org/abs/2508.01002)) |
+| Concurrent sequences | 8 | up to 128 |
+| Idle scale-down | 5 min | 2 min |
+| Approximate GPU cost | $0.80/h | $1.60/h |
+
+Both serve the same base model and adapter from the same volumes, through the
+same OpenAI-compatible `/v1/chat/completions` path. "API version" names the
+serving stack, not the OpenAI path.
+
+```sh
+modal deploy --env main serving/modal_app_v2.py
+```
+
+Save the printed URL as `MODEL_ENDPOINT_V2` in `.env`, then chat with
+`python -m serving.chat --api-version v2`. The web app shows a v1/v2 selector
+once `MODEL_ENDPOINT_V2` is in the `qwen-medical-web-config` secret.
+
+RAD (`rad_scheduler.py`, policy in `rad_policy.py`) alternates two modes. In
+prefill mode it prefills one request at a time in `chunk`-token pieces until
+`max_active` requests are decoding. In decode mode it batches one decode
+iteration for every active request until one finishes. After
+`cycle_requests` admissions it drains all active requests before starting a
+new cycle. It subclasses vLLM's V1 scheduler and restricts which requests the
+stock scheduler sees each step, so vLLM still owns KV allocation, preemption,
+and LoRA. A prefill that cannot get KV blocks forces a decode step so memory
+can drain. vLLM marks custom scheduler classes as a non-public interface; pin
+the image tag when upgrading.
+
+The knobs change at runtime through the `qwen-peft-rad-config` Modal Dict, so
+a batching sweep needs only one cold start. `policy=vllm` runs vLLM's stock
+prefill-first scheduler under the same caps, as a baseline on the same GPUs.
+
+## Load testing under a budget
+
+```sh
+python -m pip install -e '.[bench]'
+python -m serving.benchmark --api-version v2 --users 1,4,16 --rounds 2 --budget-usd 2
+python -m serving.benchmark --api-version v2 \
+  --config policy=rad,max_active=16,chunk=256 \
+  --config policy=rad,max_active=64,chunk=256 \
+  --config policy=rad,max_active=64,chunk=512
+python -m serving.benchmark --api-version v1 --users 1,4,8
+```
+
+Each user sends `--rounds` streaming requests back to back. Each level reports
+time to first token (TTFT), time between tokens (TBT), end-to-end latency, and
+output tokens per second. On v2 it also reports the scheduler's decode and
+prefill step counts. By default each request generates exactly `--max-tokens`
+(128) tokens, so runs are comparable. Each prompt gets a unique prefix so
+prefix caching does not hide prefill work. Results go to the ignored
+`serving/benchmarks/` directory.
+
+The cost guard counts elapsed GPU time from the first request (including any
+cold start) plus the idle scale-down tail. It stops launching requests once
+the estimate reaches `--budget-usd`; requests already in flight finish. The
+estimate uses Modal's L4 list price and excludes CPU and memory, which add a
+few percent. Check actual spend in the Modal dashboard.
+
+An 8B model fits on one 24 GB GPU. Over PCIe, without NVLink, tensor
+parallelism can make a single request slower; v2 should gain throughput at
+high concurrency from extra KV cache space. Compare v1 and v2 at the same
+user counts before deciding which to keep.

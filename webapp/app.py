@@ -27,13 +27,15 @@ class Message(BaseModel):
 
 class Chat(BaseModel):
     messages: list[Message] = Field(min_length=1, max_length=16)
+    api_version: Literal["v1", "v2"] = "v1"
 
 
 def create_app(settings=None, *, oauth_client=None, transport=None):
     settings = dict(os.environ if settings is None else settings)
     origin = settings.get("PUBLIC_ORIGIN", "").rstrip("/")
     allowed_id = int(settings.get("ALLOWED_GITHUB_USER_ID", "0"))
-    model_endpoint = settings.get("MODEL_ENDPOINT", "").rstrip("/")
+    model_endpoints = {"v1": settings.get("MODEL_ENDPOINT", "").rstrip("/"),
+                       "v2": settings.get("MODEL_ENDPOINT_V2", "").rstrip("/")}
     session_secret = settings.get("SESSION_SECRET", "")
     if len(session_secret) < 32:
         raise RuntimeError("A persistent SESSION_SECRET of at least 32 characters is required")
@@ -85,7 +87,8 @@ def create_app(settings=None, *, oauth_client=None, transport=None):
     @app.get("/api/me")
     async def me(request: Request):
         identity(request)
-        return {"login": request.session["login"], "csrf": request.session["csrf"]}
+        return {"login": request.session["login"], "csrf": request.session["csrf"],
+                "api_versions": [v for v, url in model_endpoints.items() if url.startswith("https://")]}
 
     @app.get("/login")
     async def login(request: Request):
@@ -132,11 +135,12 @@ def create_app(settings=None, *, oauth_client=None, transport=None):
         try:
             data = Chat.model_validate_json(body)
         except ValidationError:
-            raise HTTPException(422, "Send between 1 and 16 user/assistant messages")
+            raise HTTPException(422, "Send between 1 and 16 user/assistant messages and API v1 or v2")
         if data.messages[-1].role != "user":
             raise HTTPException(422, "The last message must be from the user")
+        model_endpoint = model_endpoints[data.api_version]
         if not model_endpoint.startswith("https://") or not settings.get("MODAL_KEY") or not settings.get("MODAL_SECRET"):
-            raise HTTPException(503, "Model connection is not configured")
+            raise HTTPException(503, f"Model connection for API {data.api_version} is not configured")
 
         async def events():
             def event(value):

@@ -9,6 +9,7 @@ results/
 adapter_model.bin
 .venv/
 serving/deployment.json
+serving/benchmarks/
 *.egg-info/
 .pytest_cache/
 serving/adapter_manifest.json

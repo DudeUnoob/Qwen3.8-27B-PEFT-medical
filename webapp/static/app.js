@@ -25,6 +25,8 @@ async function initialize() {
     if (response.status === 401) { signedOut(); return; }
     if (!response.ok) throw new Error('Unable to connect. Please refresh the page.');
     const user = await response.json(); csrf = user.csrf; $('username').textContent = user.login;
+    for (const option of $('api-version').options) option.disabled = !user.api_versions.includes(option.value);
+    if ($('api-version').selectedOptions[0]?.disabled) $('api-version').value = user.api_versions[0] || 'v1';
     $('login-view').hidden = true;
     for (const id of ['chat-view', 'account', 'new-chat']) $(id).hidden = false;
     $('prompt').focus();
@@ -37,12 +39,13 @@ $('composer').addEventListener('submit', async (event) => {
   messages.push({role: 'user', content: prompt}); addMessage('user', prompt);
   const output = addMessage('assistant', '');
   $('prompt').value = ''; $('prompt').style.height = ''; $('prompt').disabled = true;
-  $('send').hidden = true; $('stop').hidden = false;
+  $('send').hidden = true; $('stop').hidden = false; $('api-version').disabled = true;
+  const apiVersion = $('api-version').value;
   controller = new AbortController(); const started = performance.now(); let first = null, answer = '', done = false;
   setStatus('Connecting to your model… The first response may take a few minutes.'); scrollChat();
   try {
     const response = await fetch('/api/chat', {method: 'POST', signal: controller.signal,
-      headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify({messages})});
+      headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify({messages, api_version: apiVersion})});
     if (response.status === 401) { signedOut(); throw new Error('Your session expired. Please sign in again.'); }
     if (!response.ok) throw new Error((await response.json()).detail || 'Unable to send message.');
     const reader = response.body.getReader(), decoder = new TextDecoder(); let pending = '';
@@ -61,7 +64,7 @@ $('composer').addEventListener('submit', async (event) => {
         if (item.type === 'done') {
           done = true; messages.push({role: 'assistant', content: answer});
           const seconds = ((performance.now() - started) / 1000).toFixed(1);
-          setStatus(`${seconds}s total${first === null ? '' : ` · ${first.toFixed(1)}s to first token`}${item.usage ? ` · ${item.usage.completion_tokens} output tokens` : ''}`);
+          setStatus(`API ${apiVersion} · ${seconds}s total${first === null ? '' : ` · ${first.toFixed(1)}s to first token`}${item.usage ? ` · ${item.usage.completion_tokens} output tokens` : ''}`);
         }
       }
     }
@@ -72,7 +75,7 @@ $('composer').addEventListener('submit', async (event) => {
     if (error.name !== 'AbortError') showError(error.message);
     if (!answer) output.textContent = error.name === 'AbortError' ? 'Stopped.' : 'No response received.';
   } finally {
-    controller = null; $('prompt').disabled = false; $('send').hidden = false; $('stop').hidden = true; $('prompt').focus();
+    controller = null; $('prompt').disabled = false; $('api-version').disabled = false; $('send').hidden = false; $('stop').hidden = true; $('prompt').focus();
   }
 });
 $('prompt').addEventListener('input', () => { $('prompt').style.height = ''; $('prompt').style.height = Math.min($('prompt').scrollHeight, 150) + 'px'; });

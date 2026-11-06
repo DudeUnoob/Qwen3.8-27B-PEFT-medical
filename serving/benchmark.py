@@ -80,8 +80,18 @@ def summarize(records, wall_s):
     }
 
 
-async def stream_request(client, endpoint, headers, request_id, args):
+def build_prompt(request_id, args):
+    """Unique text per request so prefix caching cannot skip prefill."""
     prompt = f"[case {request_id}] {random.choice(PROMPTS)}"
+    if args.prompt_chars <= 0:
+        return prompt
+    sentence = f"Record {request_id}: symptoms are unchanged from the prior note. "
+    copies = args.prompt_chars // len(sentence) + 1
+    return f"{prompt}\n{(sentence * copies)[:args.prompt_chars]}"
+
+
+async def stream_request(client, endpoint, headers, request_id, args):
+    prompt = build_prompt(request_id, args)
     payload = {
         "model": "qwen-medical", "messages": [{"role": "user", "content": prompt}],
         "max_tokens": args.max_tokens, "temperature": 0, "stream": True,
@@ -241,7 +251,20 @@ def main():
     parser.add_argument("--budget-usd", type=float, default=2.0)
     parser.add_argument("--request-timeout", type=float, default=600)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--scenario", choices=("light", "capacity"), default="light",
+                        help="capacity uses 8, 16, and 32 users with long prompts, above v1's 8-sequence cap")
+    parser.add_argument("--prompt-chars", type=int, default=None,
+                        help="Extra characters of unique chart text appended to each prompt")
     args = parser.parse_args()
+    if args.scenario == "capacity":
+        if args.users == [1, 4, 16]:
+            args.users = [8, 16, 32]
+        if args.prompt_chars is None:
+            args.prompt_chars = 3000
+        if args.rounds == 2:
+            args.rounds = 1
+    if args.prompt_chars is None:
+        args.prompt_chars = 0
     if args.max_tokens < 1 or args.rounds < 1 or min(args.users) < 1 or max(args.users) > 128:
         parser.error("--max-tokens and --rounds must be positive; --users must be between 1 and 128")
     asyncio.run(run(args))

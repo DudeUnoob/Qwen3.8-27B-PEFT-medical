@@ -1,4 +1,4 @@
-"""API v2: Qwen3-8B PEFT inference on two tensor-parallel L4s with the RAD scheduler.
+"""API v2: Qwen3-8B PEFT inference on two tensor-parallel 24 GB GPUs with the RAD scheduler.
 
 Shares the adapter and cache volumes with v1 (serving/modal_app.py).
 """
@@ -38,7 +38,8 @@ vllm_cache = modal.Volume.from_name("qwen-peft-vllm-cache", create_if_missing=Tr
 
 @app.function(
     image=image,
-    gpu=f"L4:{GPU_COUNT}",
+    # Two 24 GB GPUs. A10G is the fallback when a pair of L4s is unavailable.
+    gpu=[f"L4:{GPU_COUNT}", f"A10G:{GPU_COUNT}"],
     min_containers=0,
     max_containers=1,
     scaledown_window=120,  # Two GPUs bill while idle; scale down sooner than v1.

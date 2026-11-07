@@ -151,6 +151,23 @@ The knobs change at runtime through the `qwen-peft-rad-config` Modal Dict, so
 a batching sweep needs only one cold start. `policy=vllm` runs vLLM's stock
 prefill-first scheduler under the same caps, as a baseline on the same GPUs.
 
+## API v3: data-parallel replicas
+
+`modal_app_v3.py` runs v1's single-GPU server as up to two replicas. Modal's
+load balancer routes each request to one replica and starts the second only
+when in-flight requests pass 75% of a replica's cap. Replicas share nothing,
+so each can fall back to A10G on its own. Set the per-replica cap at deploy
+time with `V3_MAX_NUM_SEQS` (default 8). Design, diagrams, and the decision log
+are in [docs/serving-v3-data-parallel.md](../docs/serving-v3-data-parallel.md).
+
+```sh
+modal deploy --env main serving/modal_app_v3.py
+python -m serving.chat --api-version v3
+python -m serving.smoke_test --api-version v3
+```
+
+Save the printed URL as `MODEL_ENDPOINT_V3` in `.env`.
+
 ## Load testing under a budget
 
 ```sh
@@ -161,7 +178,17 @@ python -m serving.benchmark --api-version v2 \
   --config policy=rad,max_active=64,chunk=256 \
   --config policy=rad,max_active=64,chunk=512
 python -m serving.benchmark --api-version v1 --users 1,4,8
+python -m serving.benchmark --api-version v3 --label v3-narrow --warm-replicas 2 --scenario capacity
+python -m serving.parity --apis v1,v3,v2
+python -m serving.report "serving/benchmarks/*/summary.json" --charts docs/img
 ```
+
+Scenarios: `light`, `capacity`, `long-context`, `long-decode`, and `burst`.
+Each one presets users, prompt size, and reply length; explicit flags win.
+Per-user speed is reported as TPOT, the mean time per output token after the
+first, because single inter-token gaps are distorted when several tokens
+arrive in one network read. For v3, the cost guard polls the live container
+count, so only replicas that are actually up are charged.
 
 Each user sends `--rounds` streaming requests back to back. Each level reports
 time to first token (TTFT), time between tokens (TBT), end-to-end latency, and
@@ -174,7 +201,8 @@ prefix caching does not hide prefill work. Results go to the ignored
 The cost guard counts elapsed GPU time from the first request (including any
 cold start) plus the idle scale-down tail. It stops launching requests once
 the estimate reaches `--budget-usd`; requests already in flight finish. The
-estimate uses Modal's L4 list price and excludes CPU and memory, which add a
+estimate uses the workspace list price of the dearest GPU the stack may fall
+back to (A10G, $1.10/h) and excludes CPU and memory, which add a
 few percent. Check actual spend in the Modal dashboard.
 
 An 8B model fits on one 24 GB GPU. Over PCIe, without NVLink, tensor

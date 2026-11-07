@@ -9,7 +9,10 @@ identify `Qwen/Qwen3-8B` as the actual base model.
 
 See [serving instructions](serving/README.md) for deployment, authentication,
 and API examples. The two-GPU v2 stack, RAD scheduler, and load test are
-documented in [docs/serving-v2-architecture.md](docs/serving-v2-architecture.md). Use the project's isolated environment:
+documented in [docs/serving-v2-architecture.md](docs/serving-v2-architecture.md).
+The data-parallel v3 stack (up to two single-GPU replicas behind Modal's load
+balancer) is in [docs/serving-v3-data-parallel.md](docs/serving-v3-data-parallel.md),
+and the v1/v2/v3 comparison is in [docs/serving-benchmark-results.md](docs/serving-benchmark-results.md). Use the project's isolated environment:
 
 ```sh
 source .venv/bin/activate
@@ -48,6 +51,8 @@ linked setup instructions. To stop both apps again:
 ```sh
 modal app stop qwen-peft-medical-web --env main
 modal app stop qwen-peft-medical-vllm --env main
+modal app stop qwen-peft-medical-vllm-v2 --env main
+modal app stop qwen-peft-medical-vllm-v3 --env main
 ```
 
 Stopping the apps terminates CPU/GPU containers. Saved adapter and cache volumes

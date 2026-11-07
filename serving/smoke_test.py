@@ -1,5 +1,6 @@
 """Verify endpoint authentication, adapter registration, and generation."""
 
+import argparse
 import json
 from pathlib import Path
 import time
@@ -11,12 +12,15 @@ import modal
 from serving.config import load_credentials
 
 ROOT = Path(__file__).resolve().parents[1]
+APPS = {"v1": ("qwen-peft-medical-vllm", 1), "v2": ("qwen-peft-medical-vllm-v2", 2),
+        "v3": ("qwen-peft-medical-vllm-v3", 1)}  # (app name, GPUs per container)
 
 
-def main():
+def main(api_version="v1"):
+    app_name, gpu_count = APPS[api_version]
     credentials = load_credentials(ROOT)
     endpoint = modal.Function.from_name(
-        "qwen-peft-medical-vllm", "serve", environment_name="main"
+        app_name, "serve", environment_name="main"
     ).get_web_url().rstrip("/")
     headers = {
         "Modal-Key": credentials["MODAL_KEY"],
@@ -53,10 +57,11 @@ def main():
     assert answer and answer.strip(), result
     assert result["model"] == "qwen-medical", result["model"]
     report = {
+        "api_version": api_version,
         "endpoint": endpoint,
         "base_model": "Qwen/Qwen3-8B",
         "adapter": "qwen-medical",
-        "gpu_preference": ["L4", "A10G"], "gpu_count": 1,
+        "gpu_preference": ["L4", "A10G"], "gpu_count": gpu_count,
         "auth_rejection_verified": True,
         "models": model_ids,
         "response": answer,
@@ -69,4 +74,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--api-version", default="v1", choices=sorted(APPS))
+    main(parser.parse_args().api_version)

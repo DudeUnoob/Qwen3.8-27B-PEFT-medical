@@ -133,7 +133,7 @@ def test_api_v2_streams_from_its_own_endpoint_only_when_configured():
     headers = {"Origin": ORIGIN, "X-CSRF-Token": csrf}
     assert browser.post("/api/chat", headers=headers, json=body).status_code == 503
     assert browser.post("/api/chat", headers=headers,
-                        json={**body, "api_version": "v3"}).status_code == 422
+                        json={**body, "api_version": "v4"}).status_code == 422
 
     browser = client(FakeGitHub(), httpx.MockTransport(upstream),
                      settings={**SETTINGS, "MODEL_ENDPOINT_V2": "https://model-v2.example"})
@@ -142,6 +142,28 @@ def test_api_v2_streams_from_its_own_endpoint_only_when_configured():
     response = browser.post("/api/chat", headers={**headers, "X-CSRF-Token": csrf}, json=body)
     assert [json.loads(line)["type"] for line in response.text.splitlines()] == ["token", "done"]
     assert hosts == ["model-v2.example"]
+
+
+def test_api_v3_routes_to_the_data_parallel_endpoint_only_when_configured():
+    hosts = []
+
+    def upstream(request):
+        hosts.append(request.url.host)
+        return httpx.Response(200, text='data: {"choices":[{"delta":{"content":"Hi"}}]}\n\ndata: [DONE]\n\n')
+
+    body = {"messages": [{"role": "user", "content": "Hi"}], "api_version": "v3"}
+    browser = client(FakeGitHub(), httpx.MockTransport(upstream))
+    csrf = owner(browser)
+    assert browser.post("/api/chat", headers={"Origin": ORIGIN, "X-CSRF-Token": csrf},
+                        json=body).status_code == 503
+
+    browser = client(FakeGitHub(), httpx.MockTransport(upstream),
+                     settings={**SETTINGS, "MODEL_ENDPOINT_V3": "https://model-v3.example"})
+    csrf = owner(browser)
+    assert browser.get("/api/me").json()["api_versions"] == ["v1", "v3"]
+    response = browser.post("/api/chat", headers={"Origin": ORIGIN, "X-CSRF-Token": csrf}, json=body)
+    assert [json.loads(line)["type"] for line in response.text.splitlines()] == ["token", "done"]
+    assert hosts == ["model-v3.example"]
 
 
 def test_oversize_payload_rejected_before_inference():

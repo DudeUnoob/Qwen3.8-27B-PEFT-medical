@@ -365,7 +365,7 @@ async def run(args):
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(args.request_timeout, connect=30)) as client:
             if args.warm_replicas:
-                await function.update_autoscaler.aio(min_containers=args.warm_replicas)
+                await function.autoscaler.update.aio(min_containers=args.warm_replicas)
                 print(f"Holding {args.warm_replicas} replica(s) warm until the run ends", flush=True)
             print("Warming up; a cold start can take several minutes...", flush=True)
             async with httpx.AsyncClient(timeout=httpx.Timeout(1500, connect=30)) as warm_client:
@@ -435,7 +435,7 @@ async def run(args):
                         break
     finally:
         if args.warm_replicas:
-            await function.update_autoscaler.aio(min_containers=0)
+            await function.autoscaler.update.aio(min_containers=0)
             print("Released warm replicas (min_containers=0)", flush=True)
         if poller:
             stop_polling.set()

@@ -97,13 +97,22 @@ def efficiency(rows, stack, users, baseline="v1"):
 
 
 def crossover(rows, faster, slower):
-    """Smallest user count at which `faster` beats `slower` on tok/s, or None."""
+    """Smallest user count from which `faster` beats `slower` on tok/s at every higher shared level, or None.
+
+    A single winning level followed by a loss is noise or a local bump, not a crossover.
+    """
     shared = sorted(set(rows.get(faster, {})) & set(rows.get(slower, {})))
+    wins = []
     for users in shared:
         a, b = rows[faster][users]["output_tokens_per_s"], rows[slower][users]["output_tokens_per_s"]
-        if a and b and a > b:
-            return users
-    return None
+        wins.append(bool(a and b and a > b))
+    start = None
+    for users, won in zip(shared, wins):
+        if not won:
+            start = None
+        elif start is None:
+            start = users
+    return start
 
 
 def fmt(value, digits=2, unit=""):
@@ -141,7 +150,7 @@ def markdown(tables):
 
 
 def charts(tables, out_dir):
-    """Small multiples: one panel per scenario, one line per stack, for tok/s and for $ per 1M tokens."""
+    """Small multiples: one panel per scenario, one line per stack, for tok/s, $ per 1M tokens, and median TTFT."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -150,7 +159,8 @@ def charts(tables, out_dir):
     out_dir.mkdir(parents=True, exist_ok=True)
     written = []
     for metric, title, filename in [("output_tokens_per_s", "Output tokens per second", "throughput.png"),
-                                    ("usd_per_mtok", "GPU $ per 1M output tokens", "cost.png")]:
+                                    ("usd_per_mtok", "GPU $ per 1M output tokens", "cost.png"),
+                                    ("ttft_p50_s", "Median seconds to first token", "ttft.png")]:
         scenarios = sorted(tables)
         fig, axes = plt.subplots(1, len(scenarios), figsize=(4.2 * len(scenarios), 3.6), squeeze=False)
         fig.patch.set_facecolor("#fcfcfb")
@@ -209,7 +219,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="+", help="summary.json files or globs")
     parser.add_argument("--out", type=Path, help="Write the markdown tables here instead of printing")
-    parser.add_argument("--charts", type=Path, help="Directory for throughput.png and cost.png")
+    parser.add_argument("--charts", type=Path, help="Directory for throughput.png, cost.png and ttft.png")
     args = parser.parse_args()
     paths = sorted({p for pattern in args.paths for p in (glob.glob(pattern) or [pattern])})
     tables = table(load(paths))

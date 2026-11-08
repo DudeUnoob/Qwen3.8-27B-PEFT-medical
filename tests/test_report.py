@@ -56,3 +56,14 @@ def test_older_runs_get_tpot_from_their_request_log(tmp_path):
         {"ok": True, "users": 4, "config": None, "ttft_s": 1.0, "e2e_s": 2.27, "completion_tokens": 128}) + "\n")
     rows = report.table(report.load([path]))["light"]
     assert rows["v1"][4]["tpot_p50_s"] == pytest.approx(0.01)
+
+
+def test_crossover_must_hold_at_every_higher_level():
+    def rows_for(values):
+        return {users: {"output_tokens_per_s": value} for users, value in values.items()}
+
+    rows = {"a": rows_for({8: 90, 16: 110, 32: 80, 64: 70}), "b": rows_for({8: 100, 16: 100, 32: 100, 64: 100}),
+            "c": rows_for({8: 90, 16: 110, 32: 80, 64: 120})}
+    assert report.crossover(rows, "a", "b") is None  # one winning level, then losses
+    assert report.crossover(rows, "c", "b") == 64
+    assert report.crossover(rows, "b", "a") == 32

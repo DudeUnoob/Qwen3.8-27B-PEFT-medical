@@ -117,7 +117,7 @@ DP should lose, or not be worth it:
 `serving/benchmark.py` drives all three stacks with the same simulated users. Additions for v3:
 
 - **Replica-aware cost.** For v3, the script polls `Function.get_current_stats()` every 2 s and integrates the number of live containers into GPU-seconds. Between samples it uses the larger of the two counts. If a poll fails, or before the first sample, it charges for every replica. The idle tail is charged per container still running. The budget guard stops new requests on this estimate. Prices are the workspace list prices (`modal billing rates`): L4 $0.80/h and A10G $1.10/h. The estimate always uses the dearer GPU a stack may fall back to.
-- **`--warm-replicas N`** calls `update_autoscaler(min_containers=N)` before the run and resets it to 0 in a `finally`, so no replica is left pinned on. Before measuring, it waits until N distinct replicas answer. Overflow waves force traffic onto the second replica, and `/metrics` probes identify each replica by its `process_start_time_seconds`.
+- **`--warm-replicas N`** calls `autoscaler.update(min_containers=N)` before the run and resets it to 0 in a `finally`, so no replica is left pinned on. Before measuring, it waits until N distinct replicas answer. Overflow waves force traffic onto the second replica, and `/metrics` probes identify each replica by its `process_start_time_seconds`.
 - **Scenarios:**
   - `light`: 1/4/8 users, short prompts.
   - `capacity`: 8/16/32/64 users, about 750-token prompts.

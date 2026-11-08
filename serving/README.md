@@ -205,6 +205,20 @@ estimate uses the workspace list price of the dearest GPU the stack may fall
 back to (A10G, $1.10/h) and excludes CPU and memory, which add a
 few percent. Check actual spend in the Modal dashboard.
 
+## Medical accuracy eval
+
+```sh
+python -m serving.medical_eval --api-version v1
+python -m serving.medical_eval --scoring logprob --datasets medqa,medmcqa
+```
+
+Asks `qwen-medical` and the unadapted base the same MedQA, MedMCQA, and PubMedQA
+questions through one deployment, so only the adapter differs. Prefer
+`--scoring logprob` for multiple choice: it reads the likeliest letter after
+"The answer is (", so a model that explains before answering is not marked wrong.
+Results from 7 Nov 2026, with the throughput comparison, are in
+[docs/serving-benchmark-results.md](../docs/serving-benchmark-results.md).
+
 An 8B model fits on one 24 GB GPU. Over PCIe, without NVLink, tensor
 parallelism can make a single request slower; v2 should gain throughput at
 high concurrency from extra KV cache space. Compare v1 and v2 at the same

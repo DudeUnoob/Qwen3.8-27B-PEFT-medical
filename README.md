@@ -12,7 +12,7 @@ and API examples. The two-GPU v2 stack, RAD scheduler, and load test are
 documented in [docs/serving-v2-architecture.md](docs/serving-v2-architecture.md).
 The data-parallel v3 stack (up to two single-GPU replicas behind Modal's load
 balancer) is in [docs/serving-v3-data-parallel.md](docs/serving-v3-data-parallel.md),
-and the v1/v2/v3 comparison is in [docs/serving-benchmark-results.md](docs/serving-benchmark-results.md). Use the project's isolated environment:
+and the v1/v2/v3 comparison and the adapter's accuracy evaluation are in [docs/serving-benchmark-results.md](docs/serving-benchmark-results.md). Use the project's isolated environment:
 
 ```sh
 source .venv/bin/activate

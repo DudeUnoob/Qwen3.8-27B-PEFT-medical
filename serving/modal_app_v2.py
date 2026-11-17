@@ -4,6 +4,7 @@ Shares the adapter and cache volumes with v1 (serving/modal_app.py).
 """
 
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -14,6 +15,8 @@ ADAPTER_PATH = Path("/adapters/medical")
 MODEL_NAME = "qwen-medical"
 PORT = 8000
 GPU_COUNT = 2
+# Pin one GPU type for comparable benchmark runs: V2_GPU=A10G modal deploy ...
+PINNED_GPU = os.environ.get("V2_GPU")
 RAD_CONFIG_DICT = "qwen-peft-rad-config"
 MAX_NUM_SEQS = 128
 MAX_NUM_BATCHED_TOKENS = 2048
@@ -27,7 +30,7 @@ image = (
     .pip_install("modal==1.6.3")  # The engine-core subprocess reads modal.Dict.
     .run_commands("python -c \"import pathlib, site; "
                   "pathlib.Path(site.getsitepackages()[0], 'rad.pth').write_text('/opt/rad\\n')\"")
-    .env({"RAD_CONFIG_DICT": RAD_CONFIG_DICT})
+    .env({"RAD_CONFIG_DICT": RAD_CONFIG_DICT, **({"V2_GPU": PINNED_GPU} if PINNED_GPU else {})})
     .add_local_file(HERE / "rad_policy.py", "/opt/rad/rad_policy.py")
     .add_local_file(HERE / "rad_scheduler.py", "/opt/rad/rad_scheduler.py")
 )
@@ -39,7 +42,7 @@ vllm_cache = modal.Volume.from_name("qwen-peft-vllm-cache", create_if_missing=Tr
 @app.function(
     image=image,
     # Two 24 GB GPUs. A10G is the fallback when a pair of L4s is unavailable.
-    gpu=[f"L4:{GPU_COUNT}", f"A10G:{GPU_COUNT}"],
+    gpu=f"{PINNED_GPU}:{GPU_COUNT}" if PINNED_GPU else [f"L4:{GPU_COUNT}", f"A10G:{GPU_COUNT}"],
     min_containers=0,
     max_containers=1,
     scaledown_window=120,  # Two GPUs bill while idle; scale down sooner than v1.

@@ -30,6 +30,8 @@ v2 is the throughput server. Splitting the weights leaves more memory for the ke
 
 No request failed. v1 time to first token was 0.26–0.45 seconds. v2 was 0.75–1.9 seconds. The gap between tokens was about 0.07 seconds on v1 and 0.19 seconds on v2.
 
+> **Correction (Nov 2026).** The 0.19 s figure was the 99th-percentile gap. v2's median gap was 0 s, because the stream often delivered two tokens in one read. Measured as time per output token (`(e2e − TTFT) / (tokens − 1)`), v2 decoded at 0.069 s/token against v1's 0.054 s at one user, about 28% slower rather than nearly 3×. `serving/report.py` recomputes this from the raw request logs.
+
 v2 was slower because this load never used the extra capacity. Eight short requests fit in one GPU, and v1's cap is also 8, so nothing waited in line. The second GPU only added the per-token exchange. RAD and stock vLLM on v2 matched each other: RAD logged about 260 decode steps and 4–18 prefill steps, so the scheduler was not the bottleneck.
 
 The script's cost estimate was about $0.24 using the L4 list price, including idle time before shutdown. The GPUs that ran were A10-class, so the Modal dashboard charge is higher than that estimate.

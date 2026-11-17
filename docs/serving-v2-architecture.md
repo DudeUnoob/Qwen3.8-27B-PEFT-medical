@@ -1,5 +1,7 @@
 # Serving API v2
 
+A third stack, v3, replicates the single-GPU server instead of splitting it. See [serving-v3-data-parallel.md](serving-v3-data-parallel.md).
+
 This change adds a second inference stack next to the existing one. v1 stays a single GPU with vLLM's stock scheduler. v2 runs the same Qwen3-8B medical adapter on two L4 GPUs with tensor parallelism, and schedules batches with the Resource-Aware Dynamic (RAD) policy from [Bari, Hegde, and de Veciana, arXiv:2508.01002](https://arxiv.org/abs/2508.01002).
 
 "API version" names which Modal app serves the request. Both apps speak the OpenAI path `/v1/chat/completions`. The version is chosen by the client (`--api-version`) or the web page selector, not by a different URL path.

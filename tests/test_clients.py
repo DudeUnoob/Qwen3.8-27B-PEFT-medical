@@ -47,6 +47,16 @@ def test_chat_routes_api_v2_to_its_own_endpoint(tmp_path, monkeypatch, capsys):
     assert requests[0].full_url == "https://model-v2.example/v1/chat/completions"
 
 
+def test_chat_routes_api_v3_to_its_own_endpoint(tmp_path, monkeypatch):
+    write_env(tmp_path)
+    monkeypatch.setattr(chat, "ROOT", tmp_path)
+    with pytest.raises(RuntimeError, match="MODEL_ENDPOINT_V3"):
+        chat.respond([{"role": "user", "content": "Hi"}], "qwen-medical", "v3")
+    with (tmp_path / ".env").open("a") as env:
+        env.write("MODEL_ENDPOINT_V3=https://model-v3.example/\n")
+    assert chat.resolve_endpoint(chat.load_credentials(tmp_path), "v3") == "https://model-v3.example"
+
+
 @pytest.mark.parametrize("payload", [b'', b'data: {"choices":[{"delta":{"content":"partial"}}]}\n'])
 def test_chat_rejects_stream_without_completion_marker(tmp_path, monkeypatch, capsys, payload):
     write_env(tmp_path)
@@ -111,4 +121,5 @@ def test_smoke_test_uses_same_dotenv_parser(tmp_path, monkeypatch):
     monkeypatch.setattr(smoke_test, "urlopen", urlopen)
     smoke_test.main()
     assert len(requests) == 2
+    assert json.loads((tmp_path / "serving/deployment.json").read_text())["api_version"] == "v1"
     assert (tmp_path / "serving/deployment.json").exists()

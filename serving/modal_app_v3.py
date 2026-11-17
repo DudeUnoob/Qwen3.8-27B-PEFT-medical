@@ -22,6 +22,8 @@ ADAPTER_PATH = Path("/adapters/medical")
 MODEL_NAME = "qwen-medical"
 PORT = 8000
 MAX_REPLICAS = 2
+# Pin one GPU type for comparable benchmark runs: V3_GPU=A10G modal deploy ...
+PINNED_GPU = os.environ.get("V3_GPU")
 MAX_NUM_SEQS = int(os.environ.get("V3_MAX_NUM_SEQS", "8"))
 # Scale out before a replica is full; it may burst up to MAX_NUM_SEQS meanwhile.
 TARGET_INPUTS = max(1, MAX_NUM_SEQS * 3 // 4)
@@ -31,7 +33,7 @@ image = (
     modal.Image.from_registry("vllm/vllm-openai:v0.11.0")
     .entrypoint([])
     .run_commands("ln -sf /usr/bin/python3 /usr/bin/python")
-    .env({"V3_MAX_NUM_SEQS": str(MAX_NUM_SEQS)})
+    .env({"V3_MAX_NUM_SEQS": str(MAX_NUM_SEQS), **({"V3_GPU": PINNED_GPU} if PINNED_GPU else {})})
 )
 adapters = modal.Volume.from_name("qwen-peft-adapters")
 hf_cache = modal.Volume.from_name("qwen-peft-hf-cache", create_if_missing=True)
@@ -42,7 +44,7 @@ vllm_cache = modal.Volume.from_name("qwen-peft-vllm-cache", create_if_missing=Tr
     image=image,
     # One 24 GB GPU per replica. Replicas never talk to each other, so each
     # can fall back to A10G on its own without breaking the others.
-    gpu=["L4", "A10G"],
+    gpu=PINNED_GPU or ["L4", "A10G"],
     min_containers=0,
     max_containers=MAX_REPLICAS,
     scaledown_window=120,  # Each idle replica bills its own GPU; scale down sooner than v1.

@@ -10,7 +10,11 @@ from urllib.request import Request, urlopen
 from serving.config import load_credentials
 
 ROOT = Path(__file__).resolve().parents[1]
-ENDPOINT_KEYS = {"v1": "MODEL_ENDPOINT", "v2": "MODEL_ENDPOINT_V2", "v3": "MODEL_ENDPOINT_V3"}
+ENDPOINT_KEYS = {
+    "v1": "MODEL_ENDPOINT", "v2": "MODEL_ENDPOINT_V2", "v3": "MODEL_ENDPOINT_V3",
+    "exp-v1-8": "MODEL_ENDPOINT_EXP_V1_8", "exp-v1-32": "MODEL_ENDPOINT_EXP_V1_32",
+    "exp-merged-32": "MODEL_ENDPOINT_EXP_MERGED_32",
+}
 
 
 def resolve_endpoint(credentials, api_version):

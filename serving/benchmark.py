@@ -35,6 +35,13 @@ DEPLOYMENTS = {
            "gpu_choices": ["L4", "A10G"], "idle_tail_s": 120},
     "v3": {"app": "qwen-peft-medical-vllm-v3", "gpus": 1, "max_replicas": 2,
            "gpu_choices": ["L4", "A10G"], "idle_tail_s": 120},
+    # Follow-up experiments (serving/modal_app_exp.py): one pinned A10G each.
+    "exp-v1-8": {"app": "qwen-peft-medical-exp-v1-8", "gpus": 1, "max_replicas": 1,
+                 "gpu_choices": ["A10G"], "idle_tail_s": 120},
+    "exp-v1-32": {"app": "qwen-peft-medical-exp-v1-32", "gpus": 1, "max_replicas": 1,
+                  "gpu_choices": ["A10G"], "idle_tail_s": 120},
+    "exp-merged-32": {"app": "qwen-peft-medical-exp-merged-32", "gpus": 1, "max_replicas": 1,
+                      "gpu_choices": ["A10G"], "idle_tail_s": 120},
 }
 # Presets fill in only the options left unset on the command line.
 SCENARIOS = {
@@ -370,6 +377,13 @@ async def run(args):
             print("Warming up; a cold start can take several minutes...", flush=True)
             async with httpx.AsyncClient(timeout=httpx.Timeout(1500, connect=30)) as warm_client:
                 warm = await stream_request(warm_client, endpoint, headers, "warmup", args)
+                # Modal answers 303 when a web request is still waiting after ~150 s. A cold start
+                # longer than that (v2's two GPUs, a fresh image) is still booting, so ask again.
+                for _ in range(5):
+                    if warm["ok"] or "HTTP 303" not in str(warm.get("error")):
+                        break
+                    print("Still booting (Modal redirected the waiting request); retrying...", flush=True)
+                    warm = await stream_request(warm_client, endpoint, headers, "warmup", args)
                 if not warm["ok"]:
                     raise SystemExit(f"Warm-up failed: {warm['error']}")
                 if args.warm_replicas and args.warm_replicas > 1:

@@ -167,6 +167,10 @@ def summarise(records, mode="strict"):
             entry[model] = {"accuracy": correct / len(pairs) if pairs else None, "ci95": [low, high],
                             "unparsed": sum(p[model]["parsed"] is None for p in pairs),
                             "errors": sum(p[model].get("error") is not None for p in pairs)}
+        if len(MODELS) < 2:  # one model (e.g. merged weights): accuracy only, nothing to pair
+            entry["paired"] = {"mcnemar_p": float("nan")}
+            out[dataset] = entry
+            continue
         adapter_only = sum(p[MODELS[0]]["correct"] and not p[MODELS[1]]["correct"] for p in pairs)
         base_only = sum(p[MODELS[1]]["correct"] and not p[MODELS[0]]["correct"] for p in pairs)
         entry["paired"] = {"adapter_only_correct": adapter_only, "base_only_correct": base_only,
@@ -310,7 +314,11 @@ def main(argv=None):
     parser.add_argument("--budget-usd", type=float, default=1.5)
     parser.add_argument("--request-timeout", type=float, default=600)
     parser.add_argument("--seed", type=int, default=0)
-    return parser.parse_args(argv)
+    parser.add_argument("--models", default=",".join(MODELS),
+                        help="Served model names to ask; a merged-weights server only has qwen-medical")
+    args = parser.parse_args(argv)
+    MODELS[:] = args.models.split(",")
+    return args
 
 
 if __name__ == "__main__":
